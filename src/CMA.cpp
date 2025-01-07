@@ -17,27 +17,13 @@ unsigned long previousTime = 0;         // Variable auxiliar para gestionar tiem
 
 // Nodo principal de la lista de tiempos
 GroupTime* timeListHead = NULL;
+// Nodo principal de la lista de botones
 PushButton* pushButtonListHead = NULL;
-CMA* cmaInstance;
 
 // Constructor de la clase CMA
 CMA::CMA() {}
 
-// Función para crear un nodo de tipo GroupTime
-GroupTime* createGroupTimeNode(String groupName, long timestamp)
-{
-    GroupTime* newNode = new GroupTime; // Usamos `new` en lugar de `malloc` para una mejor gestión de memoria
-    if (newNode == NULL)
-    {
-        Serial.println("Error al asignar memoria");
-        return NULL; // Si no se pudo asignar memoria, devolvemos NULL
-    }
-    newNode->groupName = groupName; // Asignamos el nombre del grupo
-    newNode->timestamp = timestamp; // Asignamos el tiempo (timestamp)
-    newNode->nextNode = NULL;       // El siguiente nodo es NULL, es el final de la lista
-    return newNode;
-}
-
+// ---------------------------------------- UTILS ---------------------------------------- //
 // Declaración de la función joinGroup como método de la clase CMA
 void CMA::joinGroup(String groupName)
 {
@@ -51,18 +37,50 @@ void CMA::joinGroup(String groupName)
     socketClient.sendEVENT(output); // Enviamos el evento al servidor
 }
 
-// Función para crear un nodo de tipo PushButton
-PushButton* createPushButtonNode(CMA* cmaInstance, String groupName)
+// Función que procesa el JSON recibido
+StaticJsonDocument<200> CMA::parseJsonData(String jsonData)
 {
-    PushButton* newNode = new PushButton; 
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, jsonData); // Deserializamos el JSON
+    if (error)
+    {
+        DEBUG_PRINTLN("Error al deserializar JSON: ");
+        DEBUG_PRINTLN(error.f_str());
+    }
+    return doc; // Retornamos el JSON procesado
+}
+
+// Inicialización del depurador (debugger)
+void CMA::initializeDebugger()
+{
+#if CMA_DEBUG
+    DEBUG_PRINTLN("Debugger inicializado");
+#endif
+}
+
+// Función para definir el intervalo de envío de mensajes
+void CMA::setMessageSendInterval(int interval)
+{
+    if (interval < 1000)
+    {
+        interval = 1000; // No permitir intervalos menores a 1000 ms
+    }
+    messageSendInterval = interval;
+}
+
+// ---------------------------------------- INDICADORES ---------------------------------------- //
+// Función para crear un nodo de tipo GroupTime
+GroupTime* createGroupTimeNode(String groupName, long timestamp)
+{
+    GroupTime* newNode = new GroupTime; // Usamos `new` en lugar de `malloc` para una mejor gestión de memoria
     if (newNode == NULL)
     {
         Serial.println("Error al asignar memoria");
         return NULL; // Si no se pudo asignar memoria, devolvemos NULL
     }
-    newNode->status = 'off';         // El estado inicial es 0
+    newNode->groupName = groupName; // Asignamos el nombre del grupo
+    newNode->timestamp = timestamp; // Asignamos el tiempo (timestamp)
     newNode->nextNode = NULL;       // El siguiente nodo es NULL, es el final de la lista
-    cmaInstance->joinGroup(groupName); // Nos unimos al grupo usando la instancia de CMA
     return newNode;
 }
 
@@ -79,27 +97,6 @@ void appendGroupTime(String groupName, long timestamp)
     {
         // Si la lista no está vacía, recorremos hasta el final y agregamos el nuevo nodo
         GroupTime* currentNode = timeListHead;
-        while (currentNode->nextNode != NULL)
-        {
-            currentNode = currentNode->nextNode;
-        }
-        currentNode->nextNode = newNode; // Enlazamos el nuevo nodo
-    }
-}
-
-// Modificación en la función appendPushButton para pasar la instancia de CMA
-void appendPushButton(CMA* cmaInstance, String groupName)
-{
-    PushButton* newNode = createPushButtonNode(cmaInstance, groupName); // Creamos el nuevo nodo
-    if (pushButtonListHead == NULL)
-    {
-        // Si la lista está vacía, el nuevo nodo se convierte en el primer nodo
-        pushButtonListHead = newNode;
-    }
-    else
-    {
-        // Si la lista no está vacía, recorremos hasta el final y agregamos el nuevo nodo
-        PushButton* currentNode = pushButtonListHead;
         while (currentNode->nextNode != NULL)
         {
             currentNode = currentNode->nextNode;
@@ -129,27 +126,6 @@ long getGroupTimestamp(String groupName)
     return -1; // Si no se encuentra el grupo, devolvemos -1
 }
 
-// Función para buscar el botón asociado a un grupo
-PushButton* getPushButton(String groupName)
-{
-    if (pushButtonListHead == NULL)
-    {
-        Serial.println("La lista de botones está vacía.");
-        return NULL; // Si la lista está vacía, devolvemos NULL
-    }
-
-    PushButton* currentNode = pushButtonListHead;
-    while (currentNode != NULL)
-    {
-        if (currentNode->groupName == groupName)
-        {
-            return currentNode;  // Si encontramos el grupo, devolvemos el nodo
-        }
-        currentNode = currentNode->nextNode;
-    }
-    return NULL; // Si no se encuentra el grupo, devolvemos NULL
-}
-
 // Función para actualizar el timestamp de un grupo específico
 void updateGroupTimestamp(String groupName, long newTimestamp)
 {
@@ -168,142 +144,6 @@ void updateGroupTimestamp(String groupName, long newTimestamp)
         }
         currentNode = currentNode->nextNode;
     }
-}
-
-// Función para actualizar el estado de un botón
-void updateStatusPushButton(String groupName, int newStatus)
-{
-    if (pushButtonListHead == NULL)
-    {
-        Serial.println("La lista de botones está vacía.");
-        return;
-    }
-
-    PushButton* currentNode = pushButtonListHead;
-    while (currentNode != NULL)
-    {
-        if (currentNode->groupName == groupName)
-        {
-            currentNode->status = newStatus; // Actualizamos el estado del botón
-        }
-        currentNode = currentNode->nextNode;
-    }
-}
-
-void handleGroupMessage(String groupName, String message)
-{
-    PushButton* currentPushButton = getPushButton(groupName);
-    if (currentPushButton != NULL)
-    {
-        currentPushButton->status = message;
-    }
-}
-
-// Función que procesa el JSON recibido
-StaticJsonDocument<200> CMA::parseJsonData(String jsonData)
-{
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, jsonData); // Deserializamos el JSON
-    if (error)
-    {
-        DEBUG_PRINTLN("Error al deserializar JSON: ");
-        DEBUG_PRINTLN(error.f_str());
-    }
-    return doc; // Retornamos el JSON procesado
-}
-
-// Inicialización del depurador (debugger)
-void CMA::initializeDebugger()
-{
-#if CMA_DEBUG
-    DEBUG_PRINTLN("Debugger inicializado");
-#endif
-}
-
-// Evento de SocketIO que maneja las diferentes acciones
-void socketIOEventHandler(socketIOmessageType_t type, uint8_t *payload, size_t length)
-{
-    switch (type)
-    {
-    case sIOtype_DISCONNECT:
-        DEBUG_PRINTLN("[SocketIO] Desconectado del servidor.");
-        if (payload != nullptr && length > 0)
-        {
-            char buffer[length + 1]; 
-            memcpy(buffer, payload, length); // Copiamos el payload a un buffer
-            buffer[length] = '\0';           // Añadimos el terminador nulo
-            DEBUG_PRINTF("Payload: %s\n", buffer); // Mostramos el payload
-        }
-        else
-        {
-            DEBUG_PRINTLN("Payload vacío o nulo");
-        }
-        socketConnected = false;
-        socketClient.begin("www.cmasystems.com.mx", 80, "/socket.io/?EIO=4");
-        socketClient.onEvent(socketIOEventHandler);
-        break;
-
-    case sIOtype_CONNECT:
-        DEBUG_PRINTLN("[SocketIO] Conectado al servidor.");
-        socketConnected = true;
-        socketClient.send(sIOtype_CONNECT, "/");
-        break;
-
-    case sIOtype_EVENT:
-    {
-        String eventData = (char *)payload;
-        eventData = eventData.substring(1, eventData.length() - 1); // Procesamos el payload
-        StaticJsonDocument<200> doc = CMA::parseJsonData(eventData);
-
-        // // Procesa el mensaje del grupo si contiene las claves necesarias
-      if (doc.containsKey("groupName") && doc.containsKey("message") && (doc['message'] == "on" || doc['message'] == "off")) {
-        handleGroupMessage(doc["groupName"], doc["message"]);
-      }
-
-        DEBUG_PRINTLN(String((const char *)payload)); // Mostramos el payload completo
-        break;
-    }
-
-    case sIOtype_ACK:
-    case sIOtype_ERROR:
-    case sIOtype_BINARY_EVENT:
-    case sIOtype_BINARY_ACK:
-        break;
-    }
-}
-
-// Función para definir el intervalo de envío de mensajes
-void CMA::setMessageSendInterval(int interval)
-{
-    if (interval < 1000)
-    {
-        interval = 1000; // No permitir intervalos menores a 1000 ms
-    }
-    messageSendInterval = interval;
-}
-
-// Conectar a la red Wi-Fi y al servidor SocketIO
-void CMA::connectToWiFiAndServer(char *ssid, char *password)
-{
-    wifiManager.addAP(ssid, password); // Añadimos el SSID y la contraseña
-    DEBUG_PRINTLN("[CMA] Conectando a Wi-Fi...");
-    while (wifiManager.run() != WL_CONNECTED)
-    {
-        delay(500); // Esperamos un poco antes de reintentar
-        DEBUG_PRINTLN("[CMA] Wi-Fi no conectado. Reintentando...");
-    }
-    DEBUG_PRINTLN("[CMA] Wi-Fi conectado.");
-
-    DEBUG_PRINTLN("[CMA] Intentando conectar con el servidor...");
-    socketClient.begin("www.cmasystems.com.mx", 80, "/socket.io/?EIO=4");
-    socketClient.onEvent(socketIOEventHandler);
-}
-
-// Bucle principal para la conexión con el servidor
-void CMA::loop()
-{
-    currentTime = millis(); // Capturamos el tiempo actual
-    socketClient.loop();    // Llamamos al loop del cliente SocketIO
 }
 
 // Función para enviar datos a un grupo
@@ -341,13 +181,201 @@ void CMA::sendMessageToGroup(String groupName, float messageData)
     }
 }
 
-void CMA::pushButtonOn(String groupName, const std::function<void()>& callback)
+// ---------------------------------------- PULSADORES ---------------------------------------- //
+// Función para crear un nodo de tipo PushButton
+PushButton* createPushButtonNode(CMA* cmaInstance, String groupName)
+{
+    PushButton* newNode = new PushButton; 
+    if (newNode == NULL)
+    {
+        Serial.println("Error al asignar memoria");
+        return NULL; // Si no se pudo asignar memoria, devolvemos NULL
+    }
+    newNode->groupName = groupName;
+    newNode->joined = false;
+    newNode->status = "off";         // El estado inicial es 0
+    newNode->nextNode = NULL;       // El siguiente nodo es NULL, es el final de la lista
+    return newNode;
+}
+
+// Función para unirse a los grupos de los botones
+void joinPushButtons()
+{
+    DEBUG_PRINTLN("[CMA] Uniendo a los grupos de los botones");
+
+    PushButton* currentNode = pushButtonListHead;
+
+    while (currentNode != NULL)
+    {   
+        if (currentNode->joined == false)
+        {
+            CMA::joinGroup(currentNode->groupName);
+            currentNode->joined = true;
+        }
+
+        currentNode = currentNode->nextNode;
+    }
+}
+
+// Función para desconectar los botones
+void disconnectPushButtons(CMA* cmaInstance)
+{
+    PushButton* currentNode = pushButtonListHead;
+    while (currentNode != NULL)
+    {
+        currentNode->joined = false;
+        currentNode = currentNode->nextNode;
+    }
+}
+
+// Función para agregar un nodo al final de la lista de botones
+void appendPushButton(CMA* cmaInstance, String groupName)
+{
+    PushButton* newNode = createPushButtonNode(cmaInstance, groupName); // Creamos el nuevo nodo
+    if (pushButtonListHead == NULL)
+    {
+        // Si la lista está vacía, el nuevo nodo se convierte en el primer nodo
+        pushButtonListHead = newNode;
+    }
+    else
+    {
+        // Si la lista no está vacía, recorremos hasta el final y agregamos el nuevo nodo
+        PushButton* currentNode = pushButtonListHead;
+        while (currentNode->nextNode != NULL)
+        {
+            currentNode = currentNode->nextNode;
+        }
+        currentNode->nextNode = newNode; // Enlazamos el nuevo nodo
+    }
+}
+
+// Función para buscar el botón asociado a un grupo
+PushButton* getPushButton(String groupName)
+{
+    if (pushButtonListHead == NULL)
+    {
+        Serial.println("La lista de botones está vacía.");
+        return NULL; // Si la lista está vacía, devolvemos NULL
+    }
+
+    PushButton* currentNode = pushButtonListHead;
+    while (currentNode != NULL)
+    {
+        if (currentNode->groupName == groupName)
+        {
+            return currentNode;  // Si encontramos el grupo, devolvemos el nodo
+        }
+        currentNode = currentNode->nextNode;
+    }
+    return NULL; // Si no se encuentra el grupo, devolvemos NULL
+}
+
+// Función para manejar evento de on u off de un botón
+void handleGroupMessage(String groupName, String message)
+{
+    PushButton* currentPushButton = getPushButton(groupName);
+    if (currentPushButton != NULL)
+    {
+        // Actualizamos el estado del botón
+        currentPushButton->status = message;
+
+        // Llamamos a la función de callback si el botón está en estado "on"
+        if (currentPushButton->status == "on" && currentPushButton->onPushButtonOnCallback != NULL)
+        {
+            currentPushButton->onPushButtonOnCallback();
+        }
+        // Llamamos a la función de callback si el botón está en estado "off"
+        else if (currentPushButton->status == "off" && currentPushButton->onPushButtonOffCallback != NULL)
+        {
+            currentPushButton->onPushButtonOffCallback();
+        }
+    }
+}
+
+// ---------------------------------------- SOCKETIO ---------------------------------------- //
+// Evento de SocketIO que maneja las diferentes acciones
+void socketIOEventHandler(socketIOmessageType_t type, uint8_t *payload, size_t length)
+{
+    switch (type)
+    {
+    case sIOtype_DISCONNECT:
+        DEBUG_PRINTLN("[SocketIO] Desconectado del servidor.");
+        if (payload != nullptr && length > 0)
+        {
+            char buffer[length + 1]; 
+            memcpy(buffer, payload, length); // Copiamos el payload a un buffer
+            buffer[length] = '\0';           // Añadimos el terminador nulo
+            DEBUG_PRINTF("Payload: %s\n", buffer); // Mostramos el payload
+        }
+        else
+        {
+            DEBUG_PRINTLN("Payload vacío o nulo");
+        }
+        socketConnected = false;
+        socketClient.begin("www.cmasystems.com.mx", 80, "/socket.io/?EIO=4");
+        socketClient.onEvent(socketIOEventHandler);
+        disconnectPushButtons(cmaInstance);
+        break;
+
+    case sIOtype_CONNECT:
+        DEBUG_PRINTLN("[SocketIO] Conectado al servidor.");
+        socketConnected = true;
+        socketClient.send(sIOtype_CONNECT, "/");
+        joinPushButtons(cmaInstance);
+        break;
+
+    case sIOtype_EVENT:
+    {
+        String eventData = (char *)payload;
+        
+        StaticJsonDocument<200> doc;
+        deserializeJson(doc, eventData);
+
+        const char* primerElemento = doc[0];
+        JsonObject segundoElemento = doc[1];
+
+        // Procesa el mensaje del grupo si contiene las claves necesarias
+        if (segundoElemento.containsKey("groupName") && segundoElemento.containsKey("message") && (segundoElemento["message"] == "on" || segundoElemento["message"] == "off")) {
+            handleGroupMessage(segundoElemento["groupName"], segundoElemento["message"]);
+        }
+
+        DEBUG_PRINTLN(String((const char *)payload)); // Mostramos el payload completo
+        break;
+    }
+
+    case sIOtype_ACK:
+    case sIOtype_ERROR:
+    case sIOtype_BINARY_EVENT:
+    case sIOtype_BINARY_ACK:
+        break;
+    }
+}
+
+// Conectar a la red Wi-Fi y al servidor SocketIO
+void CMA::connectToWiFiAndServer(char *ssid, char *password)
+{
+    wifiManager.addAP(ssid, password); // Añadimos el SSID y la contraseña
+    DEBUG_PRINTLN("[CMA] Conectando a Wi-Fi...");
+    while (wifiManager.run() != WL_CONNECTED)
+    {
+        delay(500); // Esperamos un poco antes de reintentar
+        DEBUG_PRINTLN("[CMA] Wi-Fi no conectado. Reintentando...");
+    }
+    DEBUG_PRINTLN("[CMA] Wi-Fi conectado.");
+
+    DEBUG_PRINTLN("[CMA] Intentando conectar con el servidor...");
+    socketClient.begin("www.cmasystems.com.mx", 80, "/socket.io/?EIO=4");
+    socketClient.onEvent(socketIOEventHandler);
+}
+
+// Función para manejar cuando un boton es presionado
+void CMA::onPushButtonOn(String groupName, const std::function<void()>& callback)
 {
     PushButton* currentPushButton = getPushButton(groupName);
     if (currentPushButton == NULL)
     {
         appendPushButton(cmaInstance, groupName);
-        return; 
+        currentPushButton = getPushButton(groupName);
     } 
 
     if (currentPushButton->status == "on")
@@ -356,17 +384,59 @@ void CMA::pushButtonOn(String groupName, const std::function<void()>& callback)
     }
 }
 
-void CMA::pushButtonOff(String groupName, const std::function<void()>& callback)
+// Función para manejar cuando un boton es soltado
+void CMA::onPushButtonOff(String groupName, const std::function<void()>& callback)
 {
     PushButton* currentPushButton = getPushButton(groupName);
     if (currentPushButton == NULL)
     {
         appendPushButton(cmaInstance, groupName);
-        return;
+        currentPushButton = getPushButton(groupName);
     }
 
     if (currentPushButton->status == "off")
     {
         callback();
     }
+}
+
+// Función que se ejecuta cuando ocurre un evento de presión
+void CMA::onPushButtonOnEvent(String groupName, const std::function<void()>& callback)
+{
+    PushButton* currentPushButton = getPushButton(groupName);
+    if (currentPushButton == NULL)
+    {
+        appendPushButton(cmaInstance, groupName);
+        currentPushButton = getPushButton(groupName);
+    }
+
+    if (currentPushButton != NULL)
+    {
+        currentPushButton->onPushButtonOnCallback = callback;
+        DEBUG_PRINTLN("Callback onPushButtonOnCallback agregado");
+    }
+}
+
+// Función que se ejecuta cuando ocurre un evento de soltado
+void CMA::onPushButtonOffEvent(String groupName, const std::function<void()>& callback)
+{
+    PushButton* currentPushButton = getPushButton(groupName);
+    if (currentPushButton == NULL)
+    {
+        appendPushButton(cmaInstance, groupName);
+        currentPushButton = getPushButton(groupName);
+    }
+
+    if (currentPushButton != NULL)
+    {
+        currentPushButton->onPushButtonOffCallback = callback;
+    }
+}
+
+// ---------------------------------------- LOOP ---------------------------------------- //
+// Bucle principal para la conexión con el servidor
+void CMA::loop()
+{
+    currentTime = millis(); // Capturamos el tiempo actual
+    socketClient.loop();    // Llamamos al loop del cliente SocketIO
 }
