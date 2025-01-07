@@ -40,6 +40,16 @@ struct GroupTime
     GroupTime* nextNode;  // Cambiado de time_next a nextNode
 };
 
+struct PushButton
+{
+    String groupName;  // Cambiado de groupname a groupName
+    String status;        // Cambiado de status a status
+    bool joined;
+    std::function<void()> onPushButtonOnCallback;
+    std::function<void()> onPushButtonOffCallback;
+    PushButton* nextNode;  // Cambiado de servo_next a nextNode
+};
+
 // Funciones externas
 extern void appendGroupTime(String groupName, long timestamp);  // Cambiado de append a appendGroupTime
 extern long getGroupTimestamp(String groupNameSearch);  // Cambiado de timeByGroupname a getGroupTimestamp
@@ -49,12 +59,20 @@ class CMA
 {
 public:
     CMA();
+    // ---------------------------------------- UTILS ---------------------------------------- //
     static StaticJsonDocument<200> parseJsonData(String data);  // Cambiado de getData a parseJsonData
     void connectToWiFiAndServer(char* ssid, char* pass);  // Cambiado de connect a connectToWiFiAndServer
-    void joinGroup(String groupName);
-    void loop();
+    void joinGroup(String groupName); // Unirse a un grupo de websocket
     void setMessageSendInterval(int interval);  // Cambiado de set_refresh_time a setMessageSendInterval
+    // ---------------------------------------- INDICADORES ---------------------------------------- //
     void sendMessageToGroup(String groupName, float messageData = NAN);  // Cambiado de sendToGroup a sendMessageToGroup
+    // ---------------------------------------- PULSADORES ---------------------------------------- //
+    void onPushButtonOn(String groupName, const std::function<void()>& callback); // Callback para cuando se mantiene presiona el botón
+    void onPushButtonOff(String groupName, const std::function<void()>& callback); // Callback para cuando se suelta el botón
+    void onPushButtonOnEvent(String groupName, const std::function<void()>& callback); // Callback para evento de presión
+    void onPushButtonOffEvent(String groupName, const std::function<void()>& callback); // Callback para evento de soltar
+    // ---------------------------------------- LOOP ---------------------------------------- //
+    void loop();
 
 private:
     void initializeDebugger();

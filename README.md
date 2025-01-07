@@ -5,6 +5,7 @@ La librería **CMA** permite la integración con un servidor **CMA Web SCADA** u
 ## Descripción
 
 La librería está diseñada para ser utilizada con dispositivos basados en **ESP32** o **ESP8266** que se conectan a un servidor Web SCADA mediante la tecnología de WebSocket. Permite:
+
 - Conectar a una red Wi-Fi.
 - Conectar al servidor **CMA Web SCADA**.
 - Enviar datos de sensores u otros dispositivos a grupos de manera periódica.
@@ -22,7 +23,6 @@ La librería está diseñada para ser utilizada con dispositivos basados en **ES
 
 1. **Descarga la librería**:
    - Puedes descargar la librería desde el repositorio oficial de GitHub o copiar el código a tu entorno de desarrollo.
-   
 2. **Añadir la librería al Arduino IDE**:
    - Abre el **Arduino IDE**.
    - Ve a **Sketch > Incluir Librería > Añadir .ZIP Librería**.
@@ -44,33 +44,54 @@ char* pass = "Contraseña_de_tu_red";    // Contraseña de la red WiFi
 
 void setup() {
   Serial.begin(9600);
-  
+
   // Conectar al servidor de CMA
   CMA_SOCKET.connectToWiFiAndServer(ssid, pass);
   CMA_SOCKET.setMessageSendInterval(10000); // Establecer el envío de datos cada 10 segundos
+
+  // Evento de presión del botón
+  CMA_SOCKET.onPushButtonOnEvent("1736184508911",
+    []() {
+      Serial.println("Push button event on");
+    }
+  );
 }
 
 void loop() {
   delay(8);
   CMA_SOCKET.loop();
-  
+
   // Enviar mensajes a los grupos
   CMA_SOCKET.sendMessageToGroup("1733865367813", 2);
   CMA_SOCKET.sendMessageToGroup("1733865397296", 3);
   CMA_SOCKET.sendMessageToGroup("1733865419974", 4);
   CMA_SOCKET.sendMessageToGroup("1733865475840", 5);
+
+  // Evento de presión del botón
+  CMA_SOCKET.onPushButtonOn("1736184508911",
+    []() {
+      Serial.println("Push button on");
+    }
+  );
 }
 ```
 
 ### Descripción de funciones principales
 
 - **connectToWiFiAndServer(char* ssid, char* pass)**: Conecta el dispositivo a la red Wi-Fi y al servidor Web SCADA de CMA. Requiere el nombre de la red Wi-Fi y la contraseña.
-  
 - **setMessageSendInterval(int time)**: Establece el intervalo de tiempo en milisegundos para el envío de datos. El valor por defecto es 1000 ms (1 segundo).
 
 - **sendMessageToGroup(String groupName, float data)**: Envía un mensaje al grupo especificado con el dato proporcionado. Si el dato no es válido (NaN), se generará un valor aleatorio.
 
 - **joinGroup(String groupName)**: Permite unirse a un grupo para recibir y enviar datos.
+
+- **onPushButtonOn(String groupName)**: Permite registrar un callback para que se ejecute cuando se mantiene presionado el botón. _Usarse en el loop()._
+
+- **onPushButtonOff(String groupName)**: Permite registrar un callback para que se ejecute cuando el boton no esta presionado. _Usarse en el loop()._
+
+- **onPushButtonOnEvent(String groupName, const std::function<void()>& callback)**: Permite registrar un callback para cuando ocurre un evento de presión del botón. _Usarse en el setup()._
+
+- **onPushButtonOffEvent(String groupName, const std::function<void()>& callback)**: Permite registrar un callback para cuando ocurre un evento de soltar el botón. _Usarse en el setup()._
 
 ## Variables globales
 
@@ -87,7 +108,7 @@ void loop() {
 
 ## Contribuciones
 
-Si deseas contribuir a la librería, por favor realiza un *fork* del repositorio y envía tus cambios mediante *pull requests*. Asegúrate de seguir las mejores prácticas de codificación y de probar bien cualquier nueva funcionalidad.
+Si deseas contribuir a la librería, por favor realiza un _fork_ del repositorio y envía tus cambios mediante _pull requests_. Asegúrate de seguir las mejores prácticas de codificación y de probar bien cualquier nueva funcionalidad.
 
 ## Licencia
 
