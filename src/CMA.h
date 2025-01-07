@@ -40,6 +40,13 @@ struct GroupTime
     GroupTime* nextNode;  // Cambiado de time_next a nextNode
 };
 
+struct PushButton
+{
+    String groupName;  // Cambiado de groupname a groupName
+    String status;        // Cambiado de status a status
+    PushButton* nextNode;  // Cambiado de servo_next a nextNode
+};
+
 // Funciones externas
 extern void appendGroupTime(String groupName, long timestamp);  // Cambiado de append a appendGroupTime
 extern long getGroupTimestamp(String groupNameSearch);  // Cambiado de timeByGroupname a getGroupTimestamp
@@ -55,6 +62,8 @@ public:
     void loop();
     void setMessageSendInterval(int interval);  // Cambiado de set_refresh_time a setMessageSendInterval
     void sendMessageToGroup(String groupName, float messageData = NAN);  // Cambiado de sendToGroup a sendMessageToGroup
+    void pushButtonOn(String groupName, const std::function<void()>& callback);
+    void pushButtonOff(String groupName, const std::function<void()>& callback);
 
 private:
     void initializeDebugger();

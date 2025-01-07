@@ -17,6 +17,8 @@ unsigned long previousTime = 0;         // Variable auxiliar para gestionar tiem
 
 // Nodo principal de la lista de tiempos
 GroupTime* timeListHead = NULL;
+PushButton* pushButtonListHead = NULL;
+CMA* cmaInstance;
 
 // Constructor de la clase CMA
 CMA::CMA() {}
@@ -36,6 +38,34 @@ GroupTime* createGroupTimeNode(String groupName, long timestamp)
     return newNode;
 }
 
+// Declaración de la función joinGroup como método de la clase CMA
+void CMA::joinGroup(String groupName)
+{
+    DynamicJsonDocument doc(1024);
+    JsonArray jsonArray = doc.to<JsonArray>();
+    jsonArray.add("joinGroup"); // Evento para unirse al grupo
+    JsonObject groupObject = jsonArray.createNestedObject();
+    groupObject["group"] = groupName; // Añadimos el nombre del grupo
+    String output;
+    serializeJson(doc, output); // Serializamos el JSON
+    socketClient.sendEVENT(output); // Enviamos el evento al servidor
+}
+
+// Función para crear un nodo de tipo PushButton
+PushButton* createPushButtonNode(CMA* cmaInstance, String groupName)
+{
+    PushButton* newNode = new PushButton; 
+    if (newNode == NULL)
+    {
+        Serial.println("Error al asignar memoria");
+        return NULL; // Si no se pudo asignar memoria, devolvemos NULL
+    }
+    newNode->status = 'off';         // El estado inicial es 0
+    newNode->nextNode = NULL;       // El siguiente nodo es NULL, es el final de la lista
+    cmaInstance->joinGroup(groupName); // Nos unimos al grupo usando la instancia de CMA
+    return newNode;
+}
+
 // Función para agregar un nodo al final de la lista de tiempos
 void appendGroupTime(String groupName, long timestamp)
 {
@@ -49,6 +79,27 @@ void appendGroupTime(String groupName, long timestamp)
     {
         // Si la lista no está vacía, recorremos hasta el final y agregamos el nuevo nodo
         GroupTime* currentNode = timeListHead;
+        while (currentNode->nextNode != NULL)
+        {
+            currentNode = currentNode->nextNode;
+        }
+        currentNode->nextNode = newNode; // Enlazamos el nuevo nodo
+    }
+}
+
+// Modificación en la función appendPushButton para pasar la instancia de CMA
+void appendPushButton(CMA* cmaInstance, String groupName)
+{
+    PushButton* newNode = createPushButtonNode(cmaInstance, groupName); // Creamos el nuevo nodo
+    if (pushButtonListHead == NULL)
+    {
+        // Si la lista está vacía, el nuevo nodo se convierte en el primer nodo
+        pushButtonListHead = newNode;
+    }
+    else
+    {
+        // Si la lista no está vacía, recorremos hasta el final y agregamos el nuevo nodo
+        PushButton* currentNode = pushButtonListHead;
         while (currentNode->nextNode != NULL)
         {
             currentNode = currentNode->nextNode;
@@ -78,6 +129,27 @@ long getGroupTimestamp(String groupName)
     return -1; // Si no se encuentra el grupo, devolvemos -1
 }
 
+// Función para buscar el botón asociado a un grupo
+PushButton* getPushButton(String groupName)
+{
+    if (pushButtonListHead == NULL)
+    {
+        Serial.println("La lista de botones está vacía.");
+        return NULL; // Si la lista está vacía, devolvemos NULL
+    }
+
+    PushButton* currentNode = pushButtonListHead;
+    while (currentNode != NULL)
+    {
+        if (currentNode->groupName == groupName)
+        {
+            return currentNode;  // Si encontramos el grupo, devolvemos el nodo
+        }
+        currentNode = currentNode->nextNode;
+    }
+    return NULL; // Si no se encuentra el grupo, devolvemos NULL
+}
+
 // Función para actualizar el timestamp de un grupo específico
 void updateGroupTimestamp(String groupName, long newTimestamp)
 {
@@ -95,6 +167,35 @@ void updateGroupTimestamp(String groupName, long newTimestamp)
             currentNode->timestamp = newTimestamp; // Actualizamos el timestamp del grupo
         }
         currentNode = currentNode->nextNode;
+    }
+}
+
+// Función para actualizar el estado de un botón
+void updateStatusPushButton(String groupName, int newStatus)
+{
+    if (pushButtonListHead == NULL)
+    {
+        Serial.println("La lista de botones está vacía.");
+        return;
+    }
+
+    PushButton* currentNode = pushButtonListHead;
+    while (currentNode != NULL)
+    {
+        if (currentNode->groupName == groupName)
+        {
+            currentNode->status = newStatus; // Actualizamos el estado del botón
+        }
+        currentNode = currentNode->nextNode;
+    }
+}
+
+void handleGroupMessage(String groupName, String message)
+{
+    PushButton* currentPushButton = getPushButton(groupName);
+    if (currentPushButton != NULL)
+    {
+        currentPushButton->status = message;
     }
 }
 
@@ -153,6 +254,12 @@ void socketIOEventHandler(socketIOmessageType_t type, uint8_t *payload, size_t l
         String eventData = (char *)payload;
         eventData = eventData.substring(1, eventData.length() - 1); // Procesamos el payload
         StaticJsonDocument<200> doc = CMA::parseJsonData(eventData);
+
+        // // Procesa el mensaje del grupo si contiene las claves necesarias
+      if (doc.containsKey("groupName") && doc.containsKey("message") && (doc['message'] == "on" || doc['message'] == "off")) {
+        handleGroupMessage(doc["groupName"], doc["message"]);
+      }
+
         DEBUG_PRINTLN(String((const char *)payload)); // Mostramos el payload completo
         break;
     }
@@ -199,19 +306,6 @@ void CMA::loop()
     socketClient.loop();    // Llamamos al loop del cliente SocketIO
 }
 
-// Función para unirse a un grupo
-void CMA::joinGroup(String groupName)
-{
-    DynamicJsonDocument doc(1024);
-    JsonArray jsonArray = doc.to<JsonArray>();
-    jsonArray.add("joinGroup"); // Evento para unirse al grupo
-    JsonObject groupObject = jsonArray.createNestedObject();
-    groupObject["group"] = groupName; // Añadimos el nombre del grupo
-    String output;
-    serializeJson(doc, output); // Serializamos el JSON
-    socketClient.sendEVENT(output); // Enviamos el evento al servidor
-}
-
 // Función para enviar datos a un grupo
 void CMA::sendMessageToGroup(String groupName, float messageData)
 {
@@ -244,5 +338,35 @@ void CMA::sendMessageToGroup(String groupName, float messageData)
                 DEBUG_PRINTLN("[CMA] ¡Mensaje enviado al grupo!");
             }
         }
+    }
+}
+
+void CMA::pushButtonOn(String groupName, const std::function<void()>& callback)
+{
+    PushButton* currentPushButton = getPushButton(groupName);
+    if (currentPushButton == NULL)
+    {
+        appendPushButton(cmaInstance, groupName);
+        return; 
+    } 
+
+    if (currentPushButton->status == "on")
+    {
+        callback();
+    }
+}
+
+void CMA::pushButtonOff(String groupName, const std::function<void()>& callback)
+{
+    PushButton* currentPushButton = getPushButton(groupName);
+    if (currentPushButton == NULL)
+    {
+        appendPushButton(cmaInstance, groupName);
+        return;
+    }
+
+    if (currentPushButton->status == "off")
+    {
+        callback();
     }
 }

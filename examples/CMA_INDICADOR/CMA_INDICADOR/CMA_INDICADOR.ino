@@ -5,8 +5,8 @@
 CMA CMA_SOCKET;
 
 // Credenciales de la red WiFi
-char* ssid = "Megacable_2.4G_70E0";        // Nombre de la red WiFi
-char* pass = "sk255YTA";    // Contraseña de la red WiFi
+char* ssid = "CyberSphere2.4";        // Nombre de la red WiFi
+char* pass = "KD6JVB8kmCRe";    // Contraseña de la red WiFi
 
 /**
  * @brief Función de configuración inicial de Arduino.
@@ -17,6 +17,10 @@ void setup() {
   // Conectar al servidor de CMA
   CMA_SOCKET.connectToWiFiAndServer(ssid, pass);
   CMA_SOCKET.setMessageSendInterval(10000); // Establecer el envío de datos cada 10 segundos
+}
+
+void pushButtonOn() {
+  Serial.println("Push button on");
 }
 
 /**
@@ -31,4 +35,13 @@ void loop() {
   CMA_SOCKET.sendMessageToGroup("1733865397296", 3);
   CMA_SOCKET.sendMessageToGroup("1733865419974", 4);
   CMA_SOCKET.sendMessageToGroup("1733865475840", 5);
+
+  CMA_SOCKET.pushButtonOn("1736184508911", pushButtonOn);
+
+  CMA_SOCKET.pushButtonOff("1736184508911", 
+    []() {
+      Serial.println("Push button off");
+    }
+  );
 }
+
