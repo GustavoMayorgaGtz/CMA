@@ -17,20 +17,6 @@ void setup() {
   // Conectar al servidor de CMA
   CMA_SOCKET.connectToWiFiAndServer(ssid, pass);
   CMA_SOCKET.setMessageSendInterval(10000); // Establecer el envío de datos cada 10 segundos
-
-  // Evento de presión del botón
-  CMA_SOCKET.onPushButtonOnEvent("1736352988319", 
-    []() {
-      Serial.println("Push button event on");
-    }
-  );
-
-  // Evento de soltar el botón
-  CMA_SOCKET.onPushButtonOffEvent("1736352988319", 
-    []() {
-      Serial.println("Push button event off");
-    }
-  );
 }
 
 /**
@@ -42,20 +28,5 @@ void loop() {
   
   // Enviar 2 al indicador con el grupo asignado
   CMA_SOCKET.sendMessageToGroup("1733865367813", 2);
-
-
-  // Evento que se ejecuta cuando se mantiene presionado el botón
-  CMA_SOCKET.onPushButtonOn("1736352988319", 
-    []() {
-      Serial.println("Push button on");
-    }
-  );
-
-  // Evento que se ejecuta cuando se suelta el botón
-  CMA_SOCKET.onPushButtonOff("1736352988319", 
-    []() {
-      Serial.println("Push button off");
-    }
-  );
 }
 
