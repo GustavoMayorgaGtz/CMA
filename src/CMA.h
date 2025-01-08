@@ -44,7 +44,7 @@ struct PushButton
 {
     String groupName;  // Cambiado de groupname a groupName
     String status;        // Cambiado de status a status
-    bool joined;
+    bool joined; //Muestra el estado del boton
     std::function<void()> onPushButtonOnCallback;
     std::function<void()> onPushButtonOffCallback;
     PushButton* nextNode;  // Cambiado de servo_next a nextNode
