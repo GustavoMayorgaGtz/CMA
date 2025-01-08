@@ -339,7 +339,7 @@ void socketIOEventHandler(socketIOmessageType_t type, uint8_t *payload, size_t l
             handleGroupMessage(segundoElemento["groupName"], segundoElemento["message"]);
         }
 
-        DEBUG_PRINTLN(String((const char *)payload)); // Mostramos el payload completo
+        // DEBUG_PRINTLN(String((const char *)payload)); // Mostramos el payload completo
         break;
     }
 
